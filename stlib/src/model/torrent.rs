@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sha1::{Digest, Sha1};
+use crate::model::Sha1Hash;
 
 use crate::util::common::sha1_hash;
 
@@ -41,7 +41,7 @@ pub enum TorrentInfo {
 }
 
 impl TorrentInfo {
-    pub fn sha1_hash(&self) -> [u8; 20] {
+    pub fn sha1_hash(&self) -> Sha1Hash {
         let serialized_bytes = serde_bencode::to_bytes(self)
             .expect("Couldn't serialize info dictionary for torrent file");
         sha1_hash(serialized_bytes)
@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_parse_single_correctly() {
-        let content = fs::read("test-resources/sample.torrent").unwrap();
+        let content = fs::read("test-resources/torrent/sample.torrent").unwrap();
         let torrent: Torrent =  serde_bencode::from_bytes(&content).unwrap();
 
         assert_eq!(torrent.announce, "http://bittorrent-test-tracker.codecrafters.io/announce");
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_info_hash() {
-        let content = fs::read("test-resources/sample.torrent").unwrap();
+        let content = fs::read("test-resources/torrent/sample.torrent").unwrap();
         let torrent: Torrent =  serde_bencode::from_bytes(&content).unwrap();
         let hash = hex::encode(torrent.info.sha1_hash());
         assert_eq!(hash, "d69f91e6b2ae4c542468d1073a71d4ea13879a7f")

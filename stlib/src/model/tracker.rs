@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use crate::model::Sha1Hash;
 
 #[derive(Debug)]
 pub struct TrackerNetworkInfo {
@@ -68,7 +69,7 @@ enum TrackersPeersResponse {
 #[derive(Debug, Deserialize)]
 struct LegacyPeerInfo {
     #[serde(with = "serde_bytes")]
-    pub id: [u8; 20],
+    pub id: Sha1Hash,
     pub ip: String,
     pub port: u16
 }

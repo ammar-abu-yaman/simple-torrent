@@ -1,7 +1,9 @@
 mod tracker;
 mod torrent;
-mod peer;
+mod message;
 
 pub use tracker::*;
 pub use torrent::*;
-pub use peer::*;
+pub use message::*;
+
+pub type Sha1Hash = [u8; 20];

@@ -1,10 +1,9 @@
 use std::io::{self, Read, Write};
-use std::net::TcpStream;
 
 use bit_vec::BitVec;
 use reqwest::blocking::Client;
 
-use crate::model::{PeerMessage, Torrent, TorrentInfo, TrackerNetworkInfo};
+use crate::model::{PeerMessage, Sha1Hash, Torrent, TorrentInfo, TrackerNetworkInfo};
 use crate::model::{CHOKE, UNCHOKE, INTERESTED, NOT_INTERESTED, HAVE, BITFIELD, REQUEST, PIECE, CANCEL};
 
 pub const LISTNER_PORT: u16 = 6881;
@@ -13,12 +12,12 @@ pub const PIECE_BLOCK_SIZE: u32 = 2u32.pow(14);
 #[derive(Debug, Clone)]
 pub struct TorrentClient { 
     torrent: Torrent,
-    peer_id: [u8; 20],
+    peer_id: Sha1Hash,
     client: Client,
 }
 
 impl TorrentClient {
-    pub fn new(torrent: Torrent, peer_id: [u8; 20]) -> Self {
+    pub fn new(torrent: Torrent, peer_id: Sha1Hash) -> Self {
         Self { torrent, peer_id, client: Client::new() }
     }
 }
@@ -34,11 +33,11 @@ impl TorrentClient {
         let url = format!("{}?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact={}", 
             self.torrent.announce,
             urlencoding::encode_binary(&self.torrent.info.sha1_hash()),
-            urlencoding::encode_binary(&self.peer_id).to_string(),
+            urlencoding::encode_binary(&self.peer_id),
             listener_port,
-            "0".to_string(),
-            "0".to_string(),
-            file_length.to_string(),
+            "0",
+            "0",
+            file_length,
             1,
         );
         let response = self.client.get(url).send()?;
@@ -48,21 +47,22 @@ impl TorrentClient {
 }
 
 impl TorrentClient {
-    pub fn handshake_peer<S>(&self, endpoint: &mut S) -> Result<[u8; 20], std::io::Error> 
+
+    pub fn handshake_peer<S>(&self, endpoint: &mut S) -> Result<Sha1Hash, std::io::Error> 
     where S: Read + Write 
     {
         const BUFFER_CAPACITY: usize = 1 + 19 + 8 + 20 + 20; 
         let mut buf = Vec::<u8>::with_capacity(BUFFER_CAPACITY);
-        buf.write(&[19u8])?;
-        buf.write(b"BitTorrent protocol")?;
-        buf.write(&[0u8; 8])?;
-        buf.write(&self.torrent.info.sha1_hash())?;
-        buf.write(&self.peer_id)?;
+        buf.write_all(&[19u8])?;
+        buf.write_all(b"BitTorrent protocol")?;
+        buf.write_all(&[0u8; 8])?;
+        buf.write_all(&self.torrent.info.sha1_hash())?;
+        buf.write_all(&self.peer_id)?;
         endpoint.write_all(&buf)?;
         endpoint.flush()?;
         buf.resize(BUFFER_CAPACITY, 0);
-        endpoint.read(&mut buf)?;
-        let info_hash: &[u8; 20] = &buf[1 + 19 + 8 .. 1 + 19 + 8 + 20].try_into().unwrap();
+        endpoint.read_exact(&mut buf)?;
+        let info_hash: &Sha1Hash = &buf[1 + 19 + 8 .. 1 + 19 + 8 + 20].try_into().unwrap();
         if info_hash != &self.torrent.info.sha1_hash() {
             panic!("info_hash is not equal");
         }
@@ -163,25 +163,12 @@ impl TorrentClient {
     }
 }
 
-
-fn read_non_keepalive_non_error_message(client: &TorrentClient, socket: &mut TcpStream) -> Result<PeerMessage, std::io::Error> {
-    loop {
-        let message = client.read_message(socket);
-        match &message {
-            Err(err) if err.kind() == io::ErrorKind::TimedOut => panic!("Read timed out"),
-            Ok(PeerMessage::Piece { .. }) => return Ok(message.unwrap()),
-            _ => continue,
-        }
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
-    use std::{fs, net::TcpStream, time::Duration};
+    use std::{fs, io, net::TcpStream, time::Duration};
 
     use crate::{
-        client::{read_non_keepalive_non_error_message, LISTNER_PORT, PIECE_BLOCK_SIZE},
+        client::{LISTNER_PORT, PIECE_BLOCK_SIZE},
         model::*,
         util::common::sha1_hash
     };
@@ -217,12 +204,11 @@ mod tests {
         let torrent: Torrent =  serde_bencode::from_bytes(&content).unwrap();
         let client = TorrentClient::new(torrent, b"00112233445566778899".to_owned());
         let mut socket = TcpStream::connect("165.232.33.77:51467").unwrap();
-        let peer_id: [u8; 20] = client.handshake_peer(&mut socket).unwrap();
-        println!("peer id = {}", hex::encode(peer_id));
+        let peer_id: Sha1Hash = client.handshake_peer(&mut socket).unwrap();;
     }
 
     #[test]
-    fn test_download_piece() {
+    fn test_download_file() {
         let content = fs::read("test-resources/sample.torrent").unwrap();
         let torrent: Torrent =  serde_bencode::from_bytes(&content).unwrap();
         let client = TorrentClient::new(torrent.clone(), b"00112233445566778899".to_owned());
@@ -275,7 +261,18 @@ mod tests {
         }
         if let TorrentInfo::SingleFile { name, .. } = &torrent.info {
             let piece_data = pieces_data.concat();
-            std::fs::write(name, piece_data).unwrap();
+            fs::write(name, piece_data).unwrap();
         } 
+    }
+
+    fn read_non_keepalive_non_error_message(client: &TorrentClient, socket: &mut TcpStream) -> Result<PeerMessage, std::io::Error> {
+        loop {
+            let message = client.read_message(socket);
+            match &message {
+                Err(err) if err.kind() == io::ErrorKind::TimedOut => panic!("Read timed out"),
+                Ok(PeerMessage::Piece { .. }) => return Ok(message.unwrap()),
+                _ => continue,
+            }
+        }
     }
 }
