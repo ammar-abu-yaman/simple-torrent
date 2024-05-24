@@ -13,7 +13,7 @@ pub struct PeerInfo {
 }
 
 impl PeerInfo {
-    fn to_socket_addrs(&self) -> String {
+    pub fn to_socket_addrs(&self) -> String {
         format!("{}:{}", self.ip, self.port)
     }
 }

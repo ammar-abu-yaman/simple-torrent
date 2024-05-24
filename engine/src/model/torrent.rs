@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
-#[derive(Debug, Deserialize)]
+use crate::util::common::sha1_hash;
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Torrent {
     pub announce: String,
     #[serde(rename = "announce-list", default = "empty_vec")]
     pub announce_list: Vec<Vec<String>>,
-    #[serde(rename = "created by")]
+    #[serde(rename = "created by", default = "empty_string")]
     pub created_by: String,
     #[serde(default = "empty_string")]
     pub comment: String,
@@ -17,7 +19,7 @@ pub struct Torrent {
     pub info: TorrentInfo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TorrentInfo {
     MultiFile {
@@ -40,20 +42,14 @@ pub enum TorrentInfo {
 
 impl TorrentInfo {
     pub fn sha1_hash(&self) -> [u8; 20] {
-        let mut hash = [0u8; 20];
-        let serialized = serde_bencode::to_bytes(self).expect("Couldn't serialize info dictionary for torrent file");
-        let mut hasher = Sha1::new();
-
-        hasher.update(serialized);
-        let hasher_output = hasher.finalize();
-        let result: &[u8] = hasher_output.as_slice();
-        hash.copy_from_slice(result);
-        hash
+        let serialized_bytes = serde_bencode::to_bytes(self)
+            .expect("Couldn't serialize info dictionary for torrent file");
+        sha1_hash(serialized_bytes)
     }
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
     pub path: Vec<String>,
     pub length: u64,
@@ -75,7 +71,6 @@ fn utf_8() -> String {
 mod tests { 
     use super::*;
     use std::fs;
-
 
     #[test]
     fn test_parse_single_correctly() {
