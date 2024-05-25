@@ -1,5 +1,6 @@
 pub mod model;
 pub mod client;
 pub mod util;
-mod peer;
+pub mod peer;
+pub mod tracker;
 

@@ -1,2 +1,2 @@
-mod peer;
-mod peer_pool;
+pub mod peer;
+pub mod peer_pool;
