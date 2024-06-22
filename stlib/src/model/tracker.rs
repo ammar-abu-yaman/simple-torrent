@@ -1,22 +1,18 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 use serde::Deserialize;
 use crate::model::Sha1Hash;
 
 #[derive(Debug)]
 pub struct TrackerNetworkInfo {
-    pub interval: u64,
+    pub interval: u32,
+    pub leechers: Option<u32>,
+    pub seeders: Option<u32>,
     pub peers: Vec<PeerInfo>,
 } 
 
 #[derive(Debug, PartialEq)]
 pub struct PeerInfo {
-    pub ip: String,
-    pub port: u16,
-}
-
-impl PeerInfo {
-    pub fn to_socket_addrs(&self) -> String {
-        format!("{}:{}", self.ip, self.port)
-    }
+    pub socket_addr: SocketAddr,
 }
 
 impl TrackerNetworkInfo {
@@ -24,8 +20,10 @@ impl TrackerNetworkInfo {
         let response: TrackerDiscoveryResponse =  serde_bencode::from_bytes(bytes).unwrap();
         match response {
             TrackerDiscoveryResponse::Error { failure_reason } => Err(failure_reason),
-            TrackerDiscoveryResponse::Response { interval, peers } => Ok(Self {
+            TrackerDiscoveryResponse::Response { interval, leechers, seeders, peers } => Ok(Self {
                 interval,
+                leechers,
+                seeders,
                 peers: Self::parse_peers(peers),
             })
         }
@@ -33,10 +31,13 @@ impl TrackerNetworkInfo {
 
     fn parse_peers(peers: TrackersPeersResponse) -> Vec<PeerInfo> {
         match peers {
-            TrackersPeersResponse::Legacy(peers) => peers.into_iter().map(|p| PeerInfo { ip: p.ip, port: p.port}).collect(),
+            TrackersPeersResponse::Legacy(peers) => peers.into_iter()
+                .map(|peer| PeerInfo { socket_addr: SocketAddr::new(peer.ip.parse().unwrap(), peer.port) })
+                .collect(),
             TrackersPeersResponse::Compact(peers) => peers.chunks(6).map(|chunk| PeerInfo {
-                ip: format!("{}.{}.{}.{}", chunk[0], chunk[1], chunk[2], chunk[3]),
-                port: u16::from_be_bytes(chunk[4..].try_into().unwrap()),
+                socket_addr: SocketAddr::new(IpAddr::from(
+                    Ipv4Addr::new(chunk[0], chunk[1], chunk[2], chunk[3])), u16::from_be_bytes(chunk[4..].try_into().unwrap())
+                ),
             }).collect()
         }
     }
@@ -52,7 +53,9 @@ enum TrackerDiscoveryResponse {
         failure_reason: String,
     },
     Response {
-        interval: u64,
+        interval: u32,
+        leechers: Option<u32>,
+        seeders: Option<u32>,
         peers: TrackersPeersResponse,
     }
 } 
