@@ -33,7 +33,7 @@ impl TrackerConnector for HttpTrackerConnector {
         
         Ok(TrackerNetworkInfo::from_bencode(&response)?)
     }
-    
+
 }
 
 

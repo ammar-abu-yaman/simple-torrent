@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use serde::Deserialize;
 use crate::model::Sha1Hash;
 

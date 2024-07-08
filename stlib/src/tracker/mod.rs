@@ -1,15 +1,16 @@
 mod http_connector;
 mod udp_connector;
 
+use std::future::Future;
 pub use http_connector::*;
 pub use udp_connector::*;
 
-use crate::{model::{PeerInfo, Sha1Hash, TrackerNetworkInfo}, peer::peer::PeerId};
+use crate::{ model::{ Sha1Hash, TrackerNetworkInfo }, peer::peer::PeerId };
 
 pub trait TrackerConnector {
-    async fn announce(&mut self, request: &TrackerAnnounceRequest) -> Result<TrackerNetworkInfo, String>;
+    fn announce(&mut self, request: &TrackerAnnounceRequest) -> impl Future<Output = Result<TrackerNetworkInfo, String>> + Send;
     async fn scrape(&mut self, request: &TrackerScrapeRequest) -> Result<TrackerScrapeResponse, String> {
-        unimplemented!("Not implemented");
+        unimplemented!("Not implemented")
     }
 }
 

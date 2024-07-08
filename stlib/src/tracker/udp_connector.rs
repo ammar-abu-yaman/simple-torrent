@@ -167,7 +167,7 @@ fn make_announce_request(connection_id: u64, transaction_id: u32, key: u32, requ
     cursor.write_u64::<BigEndian>(request.left as u64).unwrap();
     cursor.write_u64::<BigEndian>(request.uploaded as u64).unwrap();
     cursor.write_u32::<BigEndian>(request.event as u32).unwrap();
-    cursor.write_u32::<BigEndian>(0).unwrap();
+    cursor.write_u32::<BigEndian>(request.ip).unwrap();
     cursor.write_u32::<BigEndian>(key).unwrap();
     cursor.write_i32::<BigEndian>(-1).unwrap(); // num_want
     cursor.write_u16::<BigEndian>(request.port).unwrap();
